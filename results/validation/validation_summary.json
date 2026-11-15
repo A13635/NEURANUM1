@@ -19,21 +19,17 @@
     {
       "parameter": "Peak Gross Power Density",
       "published": 3.8,
-      "simulated": 3.9014152864183727,
+      "simulated": 3.901415286418374,
       "unit": "W/m2",
-      "rel_error": 0.026688233267992852,
+      "rel_error": 0.026688233267993203,
       "passed": true
     }
   ],
   "long_comparison": {
-    "ocv_spatial_V": 0.15520455187255452,
+    "ocv_spatial_V": 0.15520455187255447,
     "ocv_lumped_V": 0.15540508426699662,
-    "r_spatial_Ohm_m2": 0.0015435593286159534,
+    "r_spatial_Ohm_m2": 0.001543559328615953,
     "r_lumped_Ohm_m2": 0.0015491746344408694,
-    "power_spatial_W_m2": 3.9014459106602013,
-    "power_lumped_W_m2": 3.8973559983359856,
-    "polarization_effect_ocv": 0.001290385030759772,
-    "polarization_effect_resistance": -0.003624708086537118,
     "notes": "Long et al.'s lumped model neglects concentration polarization, which over-predicts OCV by 0.13% and under-predicts resistance by 0.36% compared to the spatially resolved simulator."
   }
 }

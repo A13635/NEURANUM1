@@ -74,7 +74,8 @@ def test_multi_ion_donnan_and_batch_flux_equivalence():
 
 
 def test_multicomponent_binary_limit_consistency():
-    """Pure NaCl in multicomponent 2D solver matches binary 2D OCV and gross power closely."""
+    """Pure NaCl in multicomponent 2D solver matches physical 1:1 Nernst-Donnan EMF and binary resistance/salinity."""
+    from src.multicomponent_transport import GAS_CONST, FARADAY
     cfg_bin = SimulationConfig(c_conc_inlet=500.0, c_dil_inlet=17.0, nx=40, ny=16, load_fraction=0.0)
     res_bin = run_simulation(cfg_bin, verbose=False)
 
@@ -86,7 +87,13 @@ def test_multicomponent_binary_limit_consistency():
     )
     res_mc = run_multicomponent_simulation(cfg_mc)
     assert res_mc.converged
-    assert abs(res_mc.E_ocv - res_bin.electrical.E_ocv) / res_bin.electrical.E_ocv < 0.03
+    # Exact 1D GHK with D_ct/D_co=100 closely matches the physical 1:1 TMS/Nernst-Donnan EMF (~0.17375 V)
+    # (whereas binary v1 electrical model applies concentrated-side alpha_conc=0.8944 -> 0.1552 V)
+    E_ideal_nernst = 2.0 * (GAS_CONST * 298.15 / FARADAY) * np.log(500.0 / 17.0)
+    assert abs(res_mc.E_ocv - E_ideal_nernst) / E_ideal_nernst < 0.005
+    assert abs(res_mc.R_internal - res_bin.electrical.R_internal) / res_bin.electrical.R_internal < 0.01
+    assert abs(np.mean(res_mc.c_conc["Na"]) - np.mean(res_bin.c_conc)) / np.mean(res_bin.c_conc) < 0.005
+    assert abs(np.mean(res_mc.c_dil["Na"]) - np.mean(res_bin.c_dil)) / np.mean(res_bin.c_dil) < 0.005
     assert res_mc.max_electroneutrality_err_conc < 1e-10
     assert res_mc.max_electroneutrality_err_dil < 1e-10
     assert res_mc.mass_balance_conc["Na"] < 0.01

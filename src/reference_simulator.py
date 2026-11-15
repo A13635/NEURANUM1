@@ -162,6 +162,8 @@ class SimulationResult:
     mass_balance_conc: dict
     mass_balance_dil: dict
     verification: dict = field(default_factory=dict)
+    J_cem: Optional[np.ndarray] = None
+    J_aem: Optional[np.ndarray] = None
 
 
 def run_simulation(config: SimulationConfig, verbose: bool = True) -> SimulationResult:
@@ -500,6 +502,8 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
         wall_time_seconds=wall_time,
         mass_balance_conc=mb_conc,
         mass_balance_dil=mb_dil,
+        J_cem=J_cem,
+        J_aem=J_aem,
     )
 
     return result

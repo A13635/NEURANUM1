@@ -371,7 +371,7 @@ def _multi_ion_donnan_batch(
     c_pos = {sp: np.maximum(c_sol[sp], 0.0) for sp in SPECIES_ORDER}
     tol = 1e-11 * max(abs(X_fix), 1.0)
 
-    for _ in range(40):
+    for _ in range(45):
         val = np.full(n, float(X_fix))
         der = np.zeros(n)
         for sp in SPECIES_ORDER:
@@ -380,13 +380,15 @@ def _multi_ion_donnan_batch(
             e = np.exp(np.clip(z * u, -40.0, 40.0))
             val += z * cs * e
             der += (z * z) * cs * e
-        if np.max(np.abs(val)) < tol:
+        active = np.abs(val) >= tol
+        if not np.any(active):
             break
-        lo = np.where(val < 0.0, np.maximum(lo, u), lo)
-        hi = np.where(val > 0.0, np.minimum(hi, u), hi)
+        lo = np.where(active & (val < 0.0), np.maximum(lo, u), lo)
+        hi = np.where(active & (val > 0.0), np.minimum(hi, u), hi)
         u_new = u - val / np.maximum(der, 1e-30)
         in_bounds = (u_new > lo) & (u_new < hi)
-        u = np.where(in_bounds, u_new, 0.5 * (lo + hi))
+        cand = np.where(in_bounds, u_new, 0.5 * (lo + hi))
+        u = np.where(active, cand, u)
 
     c_mem = {}
     for sp in SPECIES_ORDER:
@@ -470,16 +472,18 @@ def multi_ion_membrane_flux_batch(
         dphi = np.zeros(n)
         lo = np.full(n, -0.5)
         hi = np.full(n, 0.5)
-        for _ in range(30):
+        for _ in range(35):
             flx, I_val, dI_dphi = _eval_ghk_batch(c_mem_H, c_mem_L, D_mem, thickness, T, dphi)
             res = I_val - target_I_val
-            if np.max(np.abs(res)) < 1e-9:
+            active = np.abs(res) >= 1e-9
+            if not np.any(active):
                 break
-            hi = np.where(res > 0.0, np.minimum(hi, dphi), hi)
-            lo = np.where(res <= 0.0, np.maximum(lo, dphi), lo)
+            hi = np.where(active & (res > 0.0), np.minimum(hi, dphi), hi)
+            lo = np.where(active & (res <= 0.0), np.maximum(lo, dphi), lo)
             dphi_new = dphi - res / np.maximum(dI_dphi, 1e-12)
             in_bounds = (dphi_new > lo) & (dphi_new < hi)
-            dphi = np.where(in_bounds, dphi_new, 0.5 * (lo + hi))
+            cand = np.where(in_bounds, dphi_new, 0.5 * (lo + hi))
+            dphi = np.where(active, cand, dphi)
         flx, _, _ = _eval_ghk_batch(c_mem_H, c_mem_L, D_mem, thickness, T, dphi)
         return flx, dphi
 
@@ -501,6 +505,8 @@ def multi_ion_membrane_flux_batch(
         # Exact Donnan amplification dc_mem/dc_sol evaluated smoothly for stabilizing M-matrix diagonal:
         # Note: dc_mem_k / dc_sol_k ~ (c_mem_k / max(c_sol_k, c_reg)) modulated by Boltzmann flux weight.
         VT = GAS_CONST * T / FARADAY
+        u_H = -phi_D_H / VT
+        u_L = -phi_D_L / VT
         s_H_out = {}
         s_L_out = {}
         # Compute total Donnan denominator sum_m z_m^2 c_mem_m
@@ -520,12 +526,10 @@ def multi_ion_membrane_flux_batch(
             f_neg = _bernoulli_arr(xi)
             f_pos = _bernoulli_arr(-xi)
 
-            # Analytical d(c_mem_k)/d(c_sol_k) = (c_mem_k / c_sol_k) * (1 - z_k^2 c_mem_k / sum_m z_m^2 c_mem_m)
-            # Use safe c_sol floor for zero-inlet species so slope stays well-scaled
-            cH_s = np.maximum(c_high_wall[sp], 1e-3)
-            cL_s = np.maximum(c_low_wall[sp], 1e-3)
-            ratio_H = np.where(c_high_wall[sp] > 1e-6, c_mem_H[sp] / cH_s, 0.0)
-            ratio_L = np.where(c_low_wall[sp] > 1e-6, c_mem_L[sp] / cL_s, 0.0)
+            # Exact continuous Donnan partition ratio exp(z * u_D) = c_mem_k / c_sol_k
+            # Valid and smooth all the way down to c_sol_k = 0 (no 1e-6/1e-3 cliff)
+            ratio_H = np.exp(np.clip(z * u_H, -40.0, 40.0))
+            ratio_L = np.exp(np.clip(z * u_L, -40.0, 40.0))
             factor_H = ratio_H * np.maximum(1.0 - (z * z) * c_mem_H[sp] / denom_H, 0.05)
             factor_L = ratio_L * np.maximum(1.0 - (z * z) * c_mem_L[sp] / denom_L, 0.05)
 
@@ -778,9 +782,9 @@ class MulticomponentSimConfig:
     load_fraction: float = 0.0
     nx: int = 50
     ny: int = 20
-    max_coupling_iter: int = 60
+    max_coupling_iter: int = 100
     coupling_tol: float = 2e-4
-    relaxation: float = 0.5
+    relaxation: float = 0.35
     brine_profile_id: str = "custom"
     pH_conc: Optional[float] = 8.0
     pH_dil: Optional[float] = 7.5
@@ -878,9 +882,17 @@ def run_multicomponent_simulation(
         return float(np.mean(kap))
 
     converged = False
-    c_scale_conc = max(sum(config.conc_inlet.get(s, 0.0) for s in active_species), 1.0)
-    c_scale_dil = max(sum(config.dil_inlet.get(s, 0.0) for s in active_species), 1.0)
+    sp_scale_conc = {
+        sp: max(float(config.conc_inlet.get(sp, 0.0)), 0.1 * float(config.dil_inlet.get(sp, 0.0)), 1e-2)
+        for sp in active_species
+    }
+    sp_scale_dil = {
+        sp: max(float(config.dil_inlet.get(sp, 0.0)), 0.05 * float(config.conc_inlet.get(sp, 0.0)), 1e-2)
+        for sp in active_species
+    }
     I_op = 0.0
+    best_res = float("inf")
+    stagnant_count = 0
 
     # Anderson acceleration history (m = 4) over flattened independent species fields
     m_aa = 4
@@ -890,17 +902,17 @@ def run_multicomponent_simulation(
     def _pack_state(cc: Dict[str, np.ndarray], cd: Dict[str, np.ndarray]) -> np.ndarray:
         vecs = []
         for sp in indep_species:
-            vecs.append((cc[sp] / c_scale_conc).ravel())
-            vecs.append((cd[sp] / c_scale_dil).ravel())
+            vecs.append((cc[sp] / sp_scale_conc[sp]).ravel())
+            vecs.append((cd[sp] / sp_scale_dil[sp]).ravel())
         return np.concatenate(vecs)
 
     def _unpack_state(vec: np.ndarray, cc: Dict[str, np.ndarray], cd: Dict[str, np.ndarray]) -> None:
         blk = config.nx * config.ny
         pos = 0
         for sp in indep_species:
-            cc[sp] = np.maximum(vec[pos:pos + blk].reshape((config.nx, config.ny)) * c_scale_conc, 0.0)
+            cc[sp] = np.maximum(vec[pos:pos + blk].reshape((config.nx, config.ny)) * sp_scale_conc[sp], 0.0)
             pos += blk
-            cd[sp] = np.maximum(vec[pos:pos + blk].reshape((config.nx, config.ny)) * c_scale_dil, 0.0)
+            cd[sp] = np.maximum(vec[pos:pos + blk].reshape((config.nx, config.ny)) * sp_scale_dil[sp], 0.0)
             pos += blk
         if "Cl" in active_species:
             cl_c = np.zeros((config.nx, config.ny))
@@ -935,7 +947,8 @@ def run_multicomponent_simulation(
                 + config.membrane_thickness_aem / config.sigma_aem
             )
             E_tmp = float(np.mean(E_cem_prof + E_aem_prof))
-            I_op = config.load_fraction * (E_tmp / R_int_tmp)
+            I_new = config.load_fraction * (E_tmp / R_int_tmp)
+            I_op = I_new if it == 0 else 0.5 * I_new + 0.5 * I_op
         else:
             I_op = 0.0
 
@@ -982,35 +995,44 @@ def run_multicomponent_simulation(
             c_dil_target[sp] = cd_n
             raw_res_max = max(
                 raw_res_max,
-                float(np.max(np.abs(cc_n - c_conc[sp]))) / c_scale_conc,
-                float(np.max(np.abs(cd_n - c_dil[sp]))) / c_scale_dil,
+                float(np.max(np.abs(cc_n - c_conc[sp]))) / sp_scale_conc[sp],
+                float(np.max(np.abs(cd_n - c_dil[sp]))) / sp_scale_dil[sp],
             )
+
+        if raw_res_max < 0.98 * best_res:
+            best_res = raw_res_max
+            stagnant_count = 0
+        else:
+            stagnant_count += 1
 
         if verbose and (it % 5 == 0 or raw_res_max < config.coupling_tol):
             print(f"  [Multi-NP iter {it:2d}] raw_res={raw_res_max:.3e}, OCV={np.mean(E_cem_prof+E_aem_prof)*1000:.2f} mV")
 
-        # Ensure trace species with small bulk concentrations also satisfy tight wall-flux residual
+        # Ensure Robin linearization error is small relative to advective + wall species budget
         robin_rel_err = 0.0
         dx_fvm = np.full(config.nx, geom.concentrated.dx)
         dx_fvm[0] = 0.0
         dx_fvm[-1] = 0.5 * geom.concentrated.dx
         for sp in indep_species:
             w_tot_c = abs(float(np.sum(dx_fvm * (-J_cem[sp] - J_aem[sp]))))
-            if w_tot_c > 1e-12:
-                rob_c = abs(float(np.sum(dx_fvm * (
-                    sH_cem[sp] * np.abs(c_conc_target[sp][:, 0] - c_conc[sp][:, 0])
-                    + sH_aem[sp] * np.abs(c_conc_target[sp][:, -1] - c_conc[sp][:, -1])
-                ))))
-                robin_rel_err = max(robin_rel_err, rob_c / max(w_tot_c, 1e-12))
-            w_tot_d = abs(float(np.sum(dx_fvm * (J_aem[sp] + J_cem[sp]))))
-            if w_tot_d > 1e-12:
-                rob_d = abs(float(np.sum(dx_fvm * (
-                    sL_aem[sp] * np.abs(c_dil_target[sp][:, 0] - c_dil[sp][:, 0])
-                    + sL_cem[sp] * np.abs(c_dil_target[sp][:, -1] - c_dil[sp][:, -1])
-                ))))
-                robin_rel_err = max(robin_rel_err, rob_d / max(w_tot_d, 1e-12))
+            inlet_budget_c = abs(config.u_mean_conc * config.channel_height * float(config.conc_inlet.get(sp, 0.0)))
+            denom_c = max(inlet_budget_c + w_tot_c, 1e-12)
+            rob_c = abs(float(np.sum(dx_fvm * (
+                sH_cem[sp] * np.abs(c_conc_target[sp][:, 0] - c_conc[sp][:, 0])
+                + sH_aem[sp] * np.abs(c_conc_target[sp][:, -1] - c_conc[sp][:, -1])
+            ))))
+            robin_rel_err = max(robin_rel_err, rob_c / denom_c)
 
-        if raw_res_max < config.coupling_tol and robin_rel_err < 0.015:
+            w_tot_d = abs(float(np.sum(dx_fvm * (J_aem[sp] + J_cem[sp]))))
+            inlet_budget_d = abs(config.u_mean_dil * config.channel_height * float(config.dil_inlet.get(sp, 0.0)))
+            denom_d = max(inlet_budget_d + w_tot_d, 1e-12)
+            rob_d = abs(float(np.sum(dx_fvm * (
+                sL_aem[sp] * np.abs(c_dil_target[sp][:, 0] - c_dil[sp][:, 0])
+                + sL_cem[sp] * np.abs(c_dil_target[sp][:, -1] - c_dil[sp][:, -1])
+            ))))
+            robin_rel_err = max(robin_rel_err, rob_d / denom_d)
+
+        if raw_res_max < config.coupling_tol and robin_rel_err < 0.005:
             # Accept converged Robin-solved fields directly
             for sp in indep_species:
                 c_conc[sp] = c_conc_target[sp]
@@ -1050,6 +1072,14 @@ def run_multicomponent_simulation(
         x_curr = _pack_state(c_conc, c_dil)
         g_curr = _pack_state(c_conc_target, c_dil_target)
         f_curr = g_curr - x_curr
+
+        if stagnant_count >= 6:
+            aa_x_hist = [x_curr]
+            aa_f_hist = [f_curr]
+            stagnant_count = 0
+            x_next = np.maximum(x_curr + 0.5 * config.relaxation * f_curr, 0.0)
+            _unpack_state(x_next, c_conc, c_dil)
+            continue
 
         aa_x_hist.append(x_curr)
         aa_f_hist.append(f_curr)
