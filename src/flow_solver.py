@@ -36,6 +36,8 @@ from dataclasses import dataclass
 
 from src.geometry import ChannelGeometry, CellPairGeometry
 
+_trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
+
 
 @dataclass
 class FlowSolution:
@@ -165,7 +167,7 @@ def verify_poiseuille_mass_conservation(
     # 1. Check inlet volumetric flow rate (per unit width)
     # Q = integral of u(y) dy from 0 to H
     # Using trapezoidal rule on discrete grid has O(dy^2) error
-    Q_inlet = np.trapezoid(flow.u[0, :], y)
+    Q_inlet = _trapz(flow.u[0, :], y)
     Q_expected = flow.u_mean * H
     Q_error = abs(Q_inlet - Q_expected) / Q_expected
     results['Q_inlet'] = Q_inlet
@@ -174,7 +176,7 @@ def verify_poiseuille_mass_conservation(
     results['Q_inlet_pass'] = Q_error < 1e-3
 
     # 2. Check outlet flow rate
-    Q_outlet = np.trapezoid(flow.u[-1, :], y)
+    Q_outlet = _trapz(flow.u[-1, :], y)
     Q_outlet_error = abs(Q_outlet - Q_expected) / Q_expected
     results['Q_outlet'] = Q_outlet
     results['Q_outlet_error'] = Q_outlet_error

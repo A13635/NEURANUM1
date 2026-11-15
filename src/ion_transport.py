@@ -41,11 +41,13 @@ References:
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from dataclasses import dataclass
 
 from src.geometry import ChannelGeometry, CellPairGeometry
 from src.flow_solver import FlowSolution
+
+_trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
 
 
 @dataclass
@@ -92,6 +94,15 @@ def ambipolar_diffusivity(D_plus: float, D_minus: float) -> float:
     return 2.0 * D_plus * D_minus / (D_plus + D_minus)
 
 
+def _flux_at(J: Optional[Union[float, np.ndarray]], i: int) -> float:
+    """Return scalar flux at streamwise index i for float or 1D array input."""
+    if J is None:
+        return 0.0
+    if isinstance(J, np.ndarray):
+        return float(J[i])
+    return float(J)
+
+
 def solve_advection_diffusion_2d(
     geom: ChannelGeometry,
     flow: FlowSolution,
@@ -99,8 +110,8 @@ def solve_advection_diffusion_2d(
     c_inlet: float,
     bc_y_bottom: str = 'flux',
     bc_y_top: str = 'flux',
-    J_bottom: Optional[float] = None,
-    J_top: Optional[float] = None,
+    J_bottom: Optional[Union[float, np.ndarray]] = None,
+    J_top: Optional[Union[float, np.ndarray]] = None,
     c_wall_bottom: Optional[float] = None,
     c_wall_top: Optional[float] = None,
 ) -> np.ndarray:
@@ -186,14 +197,14 @@ def solve_advection_diffusion_2d(
                     # Forward difference: ∂c/∂y ≈ (c[i,1] - c[i,0]) / dy
                     # -D * (c[i,1] - c[i,0]) / dy = J_bottom
                     # c[i,0] - c[i,1] = J_bottom * dy / D
-                    J_val = J_bottom if J_bottom is not None else 0.0
+                    J_val = _flux_at(J_bottom, i)
                     rows.append(k)
                     cols.append(k)
                     vals.append(1.0)
                     rows.append(k)
                     cols.append(idx(i, 1))
                     vals.append(-1.0)
-                    rhs[k] = -J_val * dy / D_eff
+                    rhs[k] = J_val * dy / D_eff
                 elif bc_y_bottom == 'dirichlet':
                     rows.append(k)
                     cols.append(k)
@@ -217,7 +228,7 @@ def solve_advection_diffusion_2d(
                     # Backward difference: ∂c/∂y ≈ (c[i,ny-1] - c[i,ny-2]) / dy
                     # -D * (c[i,ny-1] - c[i,ny-2]) / dy = -J_top
                     # c[i,ny-1] - c[i,ny-2] = J_top * dy / D
-                    J_val = J_top if J_top is not None else 0.0
+                    J_val = _flux_at(J_top, i)
                     rows.append(k)
                     cols.append(k)
                     vals.append(1.0)
@@ -428,8 +439,8 @@ def check_mass_balance(
     c: np.ndarray,
     flow: FlowSolution,
     geom: ChannelGeometry,
-    J_wall_bottom: float = 0.0,
-    J_wall_top: float = 0.0
+    J_wall_bottom: Union[float, np.ndarray] = 0.0,
+    J_wall_top: Union[float, np.ndarray] = 0.0
 ) -> dict:
     """
     Check species mass balance for the channel.
@@ -448,7 +459,7 @@ def check_mass_balance(
         Flow solution
     geom : ChannelGeometry
         Channel geometry
-    J_wall_bottom, J_wall_top : float
+    J_wall_bottom, J_wall_top : float or np.ndarray
         Wall fluxes (mol/(m²·s)), positive = into channel
 
     Returns
@@ -457,16 +468,17 @@ def check_mass_balance(
         Mass balance results
     """
     y = geom.y
-    dx = geom.dx
 
     # Inlet mass flow (x=0)
-    m_in = np.trapezoid(flow.u[0, :] * c[0, :], y)
+    m_in = _trapz(flow.u[0, :] * c[0, :], y)
 
     # Outlet mass flow (x=L)
-    m_out = np.trapezoid(flow.u[-1, :] * c[-1, :], y)
+    m_out = _trapz(flow.u[-1, :] * c[-1, :], y)
 
     # Wall flux integrated over length
-    wall_flux_total = (J_wall_bottom + J_wall_top) * geom.length
+    J_bot_arr = np.broadcast_to(np.asarray(J_wall_bottom, dtype=float), (geom.nx,))
+    J_top_arr = np.broadcast_to(np.asarray(J_wall_top, dtype=float), (geom.nx,))
+    wall_flux_total = float(_trapz(J_bot_arr + J_top_arr, geom.x))
 
     # Balance: m_in + wall_flux_total = m_out
     # (wall flux positive means mass enters the channel)

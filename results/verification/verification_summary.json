@@ -9,7 +9,7 @@
     "test_id": 2,
     "name": "Species Mass Conservation",
     "passed": true,
-    "summary": "Mass balance passed=True: Conc rel err=2.548e-04, Dil rel err=7.490e-03 (criterion < 2%)"
+    "summary": "Mass balance passed=True: Conc rel err=1.012e-05, Dil rel err=2.977e-04 (criterion < 2%)"
   },
   {
     "test_id": 3,
@@ -21,7 +21,7 @@
     "test_id": 4,
     "name": "Membrane Interface Flux Consistency",
     "passed": true,
-    "summary": "Membrane flux consistency passed=True: J_CEM=1.715e-06, J_AEM=1.714e-06 mol/(m2*s)"
+    "summary": "Membrane flux consistency passed=True: J_CEM=1.714e-06, J_AEM=1.714e-06 mol/(m2*s)"
   },
   {
     "test_id": 5,
@@ -33,7 +33,7 @@
     "test_id": 6,
     "name": "Positive Physical Concentrations",
     "passed": true,
-    "summary": "Positivity passed=True: min conc = 499.87 mol/m3, min dil = 16.87 mol/m3"
+    "summary": "Positivity passed=True: min conc = 499.81 mol/m3, min dil = 17.00 mol/m3"
   },
   {
     "test_id": 7,
@@ -51,7 +51,7 @@
     "test_id": 9,
     "name": "Mesh Refinement Convergence (3 Grids)",
     "passed": true,
-    "summary": "Mesh convergence passed=True: OCV change=0.000%, Power change=0.000% (target < 2%)"
+    "summary": "Mesh convergence passed=True: OCV change=0.003%, Power change=0.002% (target < 2%)"
   },
   {
     "test_id": 10,

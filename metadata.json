@@ -1,0 +1,5 @@
+{
+  "name": "REDMind",
+  "description": "Interactive 2D Reverse Electrodialysis (RED) multi-physics simulator, ion migration visualizer, and calcite scaling diagnostic.",
+  "requestFramePermissions": []
+}

@@ -104,12 +104,42 @@ class SimulationConfig:
     # Pump
     eta_pump: float = 0.75
 
+    # Load / Current operating condition (0.0 = open-circuit, 0.5 = matched load)
+    load_fraction: float = 0.0
+    current_density: Optional[float] = None  # A/m² (overrides load_fraction if set)
+    temperature_dependent_properties: bool = True
+
     # Case ID
     case_id: str = "reference"
 
     @property
+    def mu_eff(self) -> float:
+        """Dynamic viscosity adjusted for temperature via Vogel scaling (exact at 298.15 K)."""
+        if not self.temperature_dependent_properties or abs(self.T - 298.15) < 1e-9:
+            return self.mu
+        B_vogel = 578.919
+        C_vogel = 137.546
+        return float(self.mu * np.exp(
+            B_vogel * (1.0 / (self.T - C_vogel) - 1.0 / (298.15 - C_vogel))
+        ))
+
+    @property
+    def D_na_eff(self) -> float:
+        """Na+ diffusivity scaled by Stokes-Einstein T/mu (exact at 298.15 K)."""
+        if not self.temperature_dependent_properties or abs(self.T - 298.15) < 1e-9:
+            return self.D_na
+        return float(self.D_na * (self.T / 298.15) * (self.mu / self.mu_eff))
+
+    @property
+    def D_cl_eff(self) -> float:
+        """Cl- diffusivity scaled by Stokes-Einstein T/mu (exact at 298.15 K)."""
+        if not self.temperature_dependent_properties or abs(self.T - 298.15) < 1e-9:
+            return self.D_cl
+        return float(self.D_cl * (self.T / 298.15) * (self.mu / self.mu_eff))
+
+    @property
     def D_eff(self):
-        return ambipolar_diffusivity(self.D_na, self.D_cl)
+        return ambipolar_diffusivity(self.D_na_eff, self.D_cl_eff)
 
 
 @dataclass
@@ -181,11 +211,15 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
     if verbose:
         print("\n--- Solving flow ---")
 
+    mu_eff = config.mu_eff
+    D_na_eff = config.D_na_eff
+    D_cl_eff = config.D_cl_eff
+
     flow_conc = analytical_poiseuille_2d(
-        geom.concentrated, config.u_mean_conc, config.rho, config.mu
+        geom.concentrated, config.u_mean_conc, config.rho, mu_eff
     )
     flow_dil = analytical_poiseuille_2d(
-        geom.dilute, config.u_mean_dil, config.rho, config.mu
+        geom.dilute, config.u_mean_dil, config.rho, mu_eff
     )
 
     if verbose:
@@ -199,6 +233,8 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
         print("\n--- Solving ion transport (coupled) ---")
 
     D_eff = config.D_eff
+    t_na_sol = D_na_eff / (D_na_eff + D_cl_eff)
+    t_cl_sol = D_cl_eff / (D_na_eff + D_cl_eff)
 
     # Membrane properties
     cem = MembraneProperties(
@@ -222,6 +258,8 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
 
     convergence_history = []
     converged = False
+    J_cem = np.zeros(config.nx)
+    J_aem = np.zeros(config.nx)
 
     for coupling_iter in range(config.max_coupling_iter):
         # Get wall concentrations from previous iteration
@@ -229,25 +267,73 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
         c_conc_at_cem = c_conc[:, 0]   # bottom wall of concentrated channel
         c_dil_at_cem = c_dil[:, -1]    # top wall of dilute channel
 
-        # Calculate trans-membrane salt flux through CEM
-        # Flux from concentrated to dilute (positive)
-        J_cem = np.zeros(config.nx)
-        for i in range(config.nx):
-            J_cem[i] = membrane_salt_flux(c_conc_at_cem[i], c_dil_at_cem[i], cem, config.T)
-
         # AEM interface: top of conc channel (j=-1), bottom of dil channel (j=0)
         c_conc_at_aem = c_conc[:, -1]  # top wall of concentrated channel
         c_dil_at_aem = c_dil[:, 0]     # bottom wall of dilute channel
 
+        # Operating Faradaic current density (0.0 for open-circuit default)
+        if config.current_density is not None:
+            I_op = float(config.current_density)
+        elif config.load_fraction > 0.0:
+            prof_tmp = compute_membrane_interface_profiles(
+                c_conc_wall=c_conc_at_cem,
+                c_dil_wall=c_dil_at_cem,
+                x=geom.concentrated.x,
+                X_fix_cem=config.X_cem,
+                X_fix_aem=config.X_aem,
+                T=config.T
+            )
+            elec_tmp = compute_cell_pair_performance(
+                c_conc_avg=float(np.mean(c_conc)),
+                c_dil_avg=float(np.mean(c_dil)),
+                channel_height=config.channel_height,
+                membrane_thickness_cem=config.membrane_thickness_cem,
+                membrane_thickness_aem=config.membrane_thickness_aem,
+                sigma_cem=config.sigma_cem,
+                sigma_aem=config.sigma_aem,
+                alpha_cem=float(np.mean(prof_tmp['cem']['permselectivity_conc'])),
+                alpha_aem=float(np.mean(prof_tmp['aem']['permselectivity_conc'])),
+                delta_p_conc=flow_conc.delta_p,
+                delta_p_dil=flow_dil.delta_p,
+                u_mean_conc=config.u_mean_conc,
+                u_mean_dil=config.u_mean_dil,
+                eta_pump=config.eta_pump,
+                T=config.T,
+                channel_length=config.channel_length,
+                D_na=D_na_eff,
+                D_cl=D_cl_eff,
+            )
+            I_op = config.load_fraction * (elec_tmp.E_ocv / elec_tmp.R_internal)
+        else:
+            I_op = 0.0
+
+        # Calculate local trans-membrane salt flux through CEM and AEM (positive: conc -> dil)
+        J_cem = np.zeros(config.nx)
         J_aem = np.zeros(config.nx)
         for i in range(config.nx):
-            J_aem[i] = membrane_salt_flux(c_conc_at_aem[i], c_dil_at_aem[i], aem, config.T)
+            J_diff_cem = membrane_salt_flux(c_conc_at_cem[i], c_dil_at_cem[i], cem, config.T)
+            J_diff_aem = membrane_salt_flux(c_conc_at_aem[i], c_dil_at_aem[i], aem, config.T)
+            if I_op != 0.0:
+                don_cem_c = donnan_equilibrium_1to1(c_conc_at_cem[i], config.X_cem, config.T)
+                don_cem_d = donnan_equilibrium_1to1(c_dil_at_cem[i], config.X_cem, config.T)
+                alpha_cem_i = 0.5 * (don_cem_c.permselectivity + don_cem_d.permselectivity)
+                t_na_cem = 0.5 * (1.0 + alpha_cem_i)
 
-        # Average fluxes for uniform BC (simplification for FD solver)
-        J_cem_avg = np.mean(J_cem)
-        J_aem_avg = np.mean(J_aem)
+                don_aem_c = donnan_equilibrium_1to1(c_conc_at_aem[i], config.X_aem, config.T)
+                don_aem_d = donnan_equilibrium_1to1(c_dil_at_aem[i], config.X_aem, config.T)
+                alpha_aem_i = 0.5 * (don_aem_c.permselectivity + don_aem_d.permselectivity)
+                t_cl_aem = 0.5 * (1.0 + alpha_aem_i)
 
-        # Solve concentrated channel:
+                J_cem[i] = J_diff_cem + (t_na_cem - t_na_sol) * (I_op / FARADAY)
+                J_aem[i] = J_diff_aem + (t_cl_aem - t_cl_sol) * (I_op / FARADAY)
+            else:
+                J_cem[i] = J_diff_cem
+                J_aem[i] = J_diff_aem
+
+        J_cem_avg = float(np.mean(J_cem))
+        J_aem_avg = float(np.mean(J_aem))
+
+        # Solve concentrated channel using spatially resolved local fluxes J(x):
         #   Bottom wall (j=0): CEM interface, salt leaves → negative flux
         #   Top wall (j=-1): AEM interface, salt leaves → negative flux
         c_conc_new = solve_advection_diffusion_2d(
@@ -257,11 +343,11 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
             c_inlet=config.c_conc_inlet,
             bc_y_bottom='flux',
             bc_y_top='flux',
-            J_bottom=-J_cem_avg,   # salt leaves conc channel through CEM
-            J_top=-J_aem_avg,      # salt leaves conc channel through AEM
+            J_bottom=-J_cem,        # salt leaves conc channel through CEM
+            J_top=-J_aem,           # salt leaves conc channel through AEM
         )
 
-        # Solve dilute channel:
+        # Solve dilute channel using spatially resolved local fluxes J(x):
         #   Bottom wall (j=0): AEM interface, salt enters → positive flux
         #   Top wall (j=-1): CEM interface, salt enters → positive flux
         c_dil_new = solve_advection_diffusion_2d(
@@ -271,8 +357,8 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
             c_inlet=config.c_dil_inlet,
             bc_y_bottom='flux',
             bc_y_top='flux',
-            J_bottom=J_aem_avg,    # salt enters dil channel through AEM
-            J_top=J_cem_avg,       # salt enters dil channel through CEM
+            J_bottom=J_aem,         # salt enters dil channel through AEM
+            J_top=J_cem,            # salt enters dil channel through CEM
         )
 
         # Ensure positivity
@@ -320,10 +406,10 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
 
     # 4. Compute electric potential
     phi_conc = compute_electric_potential(
-        c_conc, geom.concentrated, config.D_na, config.D_cl, config.T
+        c_conc, geom.concentrated, D_na_eff, D_cl_eff, config.T
     )
     phi_dil = compute_electric_potential(
-        c_dil, geom.dilute, config.D_na, config.D_cl, config.T
+        c_dil, geom.dilute, D_na_eff, D_cl_eff, config.T
     )
 
     # 5. Compute membrane interface profiles
@@ -365,18 +451,20 @@ def run_simulation(config: SimulationConfig, verbose: bool = True) -> Simulation
         eta_pump=config.eta_pump,
         T=config.T,
         channel_length=config.channel_length,
+        D_na=D_na_eff,
+        D_cl=D_cl_eff,
     )
 
-    # 7. Mass balance checks
+    # 7. Mass balance checks using spatially resolved wall fluxes
     mb_conc = check_mass_balance(
         c_conc, flow_conc, geom.concentrated,
-        J_wall_bottom=-J_cem_avg,
-        J_wall_top=-J_aem_avg
+        J_wall_bottom=-J_cem,
+        J_wall_top=-J_aem
     )
     mb_dil = check_mass_balance(
         c_dil, flow_dil, geom.dilute,
-        J_wall_bottom=J_aem_avg,
-        J_wall_top=J_cem_avg
+        J_wall_bottom=J_aem,
+        J_wall_top=J_cem
     )
 
     wall_time = time.time() - t_start

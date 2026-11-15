@@ -3,9 +3,9 @@
     {
       "parameter": "Open-Circuit Voltage (OCV)",
       "published": 0.155,
-      "simulated": 0.1554030164191571,
+      "simulated": 0.1552064329330406,
       "unit": "V",
-      "rel_error": 0.002600105930045832,
+      "rel_error": 0.0013318253744554556,
       "passed": true
     },
     {
@@ -19,17 +19,21 @@
     {
       "parameter": "Peak Gross Power Density",
       "published": 3.8,
-      "simulated": 3.8972572493907753,
+      "simulated": 3.9014152864183727,
       "unit": "W/m2",
-      "rel_error": 0.025594012997572503,
+      "rel_error": 0.026688233267992852,
       "passed": true
     }
   ],
   "long_comparison": {
-    "ocv_spatial_V": 0.1554030282863202,
+    "ocv_spatial_V": 0.15520455187255452,
     "ocv_lumped_V": 0.15540508426699662,
-    "r_spatial_Ohm_m2": 0.0015491726455684365,
+    "r_spatial_Ohm_m2": 0.0015435593286159534,
     "r_lumped_Ohm_m2": 0.0015491746344408694,
-    "notes": "Long et al.'s lumped model neglects concentration polarization, which over-predicts OCV by 0.00% and under-predicts resistance by 0.00% compared to the spatially resolved simulator."
+    "power_spatial_W_m2": 3.9014459106602013,
+    "power_lumped_W_m2": 3.8973559983359856,
+    "polarization_effect_ocv": 0.001290385030759772,
+    "polarization_effect_resistance": -0.003624708086537118,
+    "notes": "Long et al.'s lumped model neglects concentration polarization, which over-predicts OCV by 0.13% and under-predicts resistance by 0.36% compared to the spatially resolved simulator."
   }
 }

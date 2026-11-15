@@ -50,7 +50,12 @@ class ElectricalResult:
     alpha_aem: float          # AEM permselectivity used
 
 
-def solution_conductivity_nacl(c: float, T: float = 298.15) -> float:
+def solution_conductivity_nacl(
+    c: float,
+    T: float = 298.15,
+    D_na: float = 1.334e-9,
+    D_cl: float = 2.032e-9,
+) -> float:
     """
     Estimate NaCl solution conductivity from concentration.
 
@@ -69,15 +74,14 @@ def solution_conductivity_nacl(c: float, T: float = 298.15) -> float:
         NaCl concentration (mol/m³)
     T : float
         Temperature (K)
+    D_na, D_cl : float
+        Ion diffusion coefficients (m²/s)
 
     Returns
     -------
     float
         Conductivity (S/m)
     """
-    D_na = 1.334e-9
-    D_cl = 2.032e-9
-
     # Nernst-Einstein relation for conductivity
     sigma = FARADAY**2 / (GAS_CONST * T) * (D_na + D_cl) * c
 
@@ -87,7 +91,9 @@ def solution_conductivity_nacl(c: float, T: float = 298.15) -> float:
 def channel_resistance(
     c_avg: float,
     channel_height: float,
-    T: float = 298.15
+    T: float = 298.15,
+    D_na: float = 1.334e-9,
+    D_cl: float = 2.032e-9,
 ) -> float:
     """
     Calculate areal resistance of a solution channel.
@@ -104,13 +110,15 @@ def channel_resistance(
         Channel height (m)
     T : float
         Temperature (K)
+    D_na, D_cl : float
+        Ion diffusion coefficients (m²/s)
 
     Returns
     -------
     float
         Areal resistance (Ω·m²)
     """
-    sigma = solution_conductivity_nacl(c_avg, T)
+    sigma = solution_conductivity_nacl(c_avg, T, D_na=D_na, D_cl=D_cl)
     return channel_height / max(sigma, 1e-10)
 
 
@@ -155,6 +163,8 @@ def compute_cell_pair_performance(
     eta_pump: float = 0.75,
     T: float = 298.15,
     channel_length: float = 0.10,
+    D_na: float = 1.334e-9,
+    D_cl: float = 2.032e-9,
 ) -> ElectricalResult:
     """
     Compute electrical performance of a single cell pair.
@@ -183,6 +193,8 @@ def compute_cell_pair_performance(
         Temperature (K)
     channel_length : float
         Channel length (m)
+    D_na, D_cl : float
+        Ion diffusion coefficients (m²/s)
 
     Returns
     -------
@@ -194,8 +206,8 @@ def compute_cell_pair_performance(
             np.log(c_conc_avg / max(c_dil_avg, 1e-10))
 
     # Internal resistances (areal, per cell pair)
-    R_conc = channel_resistance(c_conc_avg, channel_height, T)
-    R_dil = channel_resistance(c_dil_avg, channel_height, T)
+    R_conc = channel_resistance(c_conc_avg, channel_height, T, D_na=D_na, D_cl=D_cl)
+    R_dil = channel_resistance(c_dil_avg, channel_height, T, D_na=D_na, D_cl=D_cl)
     R_cem = membrane_resistance(membrane_thickness_cem, sigma_cem)
     R_aem = membrane_resistance(membrane_thickness_aem, sigma_aem)
     R_internal = R_conc + R_dil + R_cem + R_aem
