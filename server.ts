@@ -16,6 +16,10 @@ import {
   runValidationSuiteLive,
   runVerificationSuiteLive,
 } from './lib/verificationEngine';
+import {
+  buildPosterPdfBuffer,
+  buildPosterPptxBuffer,
+} from './lib/posterExport';
 
 const ROOT = process.cwd();
 
@@ -635,6 +639,50 @@ async function startServer() {
     }
   });
 
+  // 10. Downloadable ISEF Display Board (.pptx and .pdf)
+  app.get('/api/poster/download/pptx', async (req, res) => {
+    try {
+      const buf = await buildPosterPptxBuffer({
+        projectCode: String(req.query.projectCode ?? ''),
+        teamMembers: String(req.query.teamMembers ?? ''),
+        schoolName: String(req.query.schoolName ?? ''),
+      });
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="NEURANUM_ISEF_Poster_48x36.pptx"'
+      );
+      res.send(buf);
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'PPTX export failed',
+      });
+    }
+  });
+
+  app.get('/api/poster/download/pdf', async (req, res) => {
+    try {
+      const buf = await buildPosterPdfBuffer({
+        projectCode: String(req.query.projectCode ?? ''),
+        teamMembers: String(req.query.teamMembers ?? ''),
+        schoolName: String(req.query.schoolName ?? ''),
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="NEURANUM_ISEF_Poster_48x36.pdf"'
+      );
+      res.send(buf);
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'PDF export failed',
+      });
+    }
+  });
+
   // Vite / Static SPA serving
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -651,7 +699,7 @@ async function startServer() {
   }
 
   app.listen(3000, '0.0.0.0', () => {
-    console.log('REDMind v2.0.0 Full-Stack Server listening on http://0.0.0.0:3000');
+    console.log('NEURANUM v2.0.0 Full-Stack Server listening on http://0.0.0.0:3000');
   });
 }
 

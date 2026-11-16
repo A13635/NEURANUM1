@@ -123,7 +123,7 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
             Executable Verification &amp; Literature Validation Deck
           </h1>
           <p className="mt-1 text-sm text-slate-400 max-w-3xl">
-            Run live physics checks, literature comparisons, Pitzer/CNT benchmarks, and v1.0.0-to-v2.0.0 baseline audits directly against the REDMind v2.0.0 solver and on-disk archives.
+            Run live physics checks, literature comparisons, Pitzer/CNT benchmarks, and v1.0.0-to-v2.0.0 baseline audits directly against the NEURANUM v2.0.0 solver and on-disk archives.
           </p>
         </div>
         <div className="text-xs font-mono tabular-nums text-slate-400">

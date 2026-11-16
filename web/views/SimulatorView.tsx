@@ -317,7 +317,7 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({
     a.href = url;
     a.download = loadedNpz
       ? `${loadedNpz.caseId}_fields.json`
-      : `redmind_v2_${cfg.solverMode}_${cfg.caseId}.json`;
+      : `neuranum_v2_${cfg.solverMode}_${cfg.caseId}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

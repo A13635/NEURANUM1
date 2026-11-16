@@ -51,7 +51,7 @@ export const SpecificationsView: React.FC = () => {
             Model Specification, Governing Equations &amp; Discretization
           </h1>
           <p className="mt-1 text-sm text-slate-400 max-w-3xl">
-            Complete mathematical specification of REDMind v2.0.0: 2D periodic cell-pair geometry, analytical Poiseuille hydrodynamics, repaired binary NaCl PDE, 8-ion Nernst–Planck + Donnan–GHK transport, USGS Pitzer HMW thermodynamics, Santoro (2021) heterogeneous CNT nucleation, and numerical methods.
+            Complete mathematical specification of NEURANUM v2.0.0: 2D periodic cell-pair geometry, analytical Poiseuille hydrodynamics, repaired binary NaCl PDE, 8-ion Nernst–Planck + Donnan–GHK transport, USGS Pitzer HMW thermodynamics, Santoro (2021) heterogeneous CNT nucleation, and numerical methods.
           </p>
         </div>
 

@@ -39,7 +39,7 @@ export function runVerificationSuiteLive(): CommandRunResult {
   const tStart = performance.now();
   const stdout: string[] = [
     '======================================================================',
-    'RUNNING MANDATORY VERIFICATION SUITE (10 TESTS) — REDMind v2.0.0',
+    'RUNNING MANDATORY VERIFICATION SUITE (10 TESTS) — NEURANUM v2.0.0',
     '======================================================================',
   ];
   const items: CommandTestItem[] = [];

@@ -4,7 +4,8 @@ export type NavTab =
   | 'equations'
   | 'datasets'
   | 'verification'
-  | 'library';
+  | 'library'
+  | 'poster';
 
 export type DatasetCategory =
   | 'clean_baseline'

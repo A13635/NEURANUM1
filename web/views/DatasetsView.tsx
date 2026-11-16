@@ -820,7 +820,7 @@ const OrganicSilicaBiofoulingView: React.FC<{
               Non-Inorganic Fouling Audit: Organic, Colloidal Silica &amp; Biofouling Scope
             </h2>
             <p className="text-xs text-slate-300 leading-relaxed max-w-[80ch]">
-              In strict compliance with <span className="font-mono text-cyan-300">reports/limitations.md (§4–5)</span> and <span className="font-mono text-cyan-300">MODEL_SPECIFICATION.md</span>, REDMind v2.0.0 models <strong>inorganic mineral scaling</strong> (CaCO₃ calcite and CaSO₄·2H₂O gypsum) via validated USGS Pitzer thermodynamics and Santoro (2021) CNT barriers. Synthetic datasets are <strong>never fabricated</strong> for excluded or paywalled biological/organic/colloidal fouling mechanisms.
+              In strict compliance with <span className="font-mono text-cyan-300">reports/limitations.md (§4–5)</span> and <span className="font-mono text-cyan-300">MODEL_SPECIFICATION.md</span>, NEURANUM v2.0.0 models <strong>inorganic mineral scaling</strong> (CaCO₃ calcite and CaSO₄·2H₂O gypsum) via validated USGS Pitzer thermodynamics and Santoro (2021) CNT barriers. Synthetic datasets are <strong>never fabricated</strong> for excluded or paywalled biological/organic/colloidal fouling mechanisms.
             </p>
           </div>
         </div>

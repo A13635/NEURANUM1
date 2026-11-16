@@ -313,7 +313,7 @@ const REFERENCES: ReferenceEntry[] = [
     roleLabel: 'Organic / Colloidal / Biofouling Scope Boundary',
     usedItems: [
       'Provides the multi-mechanism taxonomy distinguishing inorganic scaling from organic fouling (humic acid/alginate), colloidal clay/silica fouling, and biofouling/EPS.',
-      'Enforces REDMind v2.0.0 scientific integrity policy: isolates inorganic CaCO₃ / CaSO₄·2H₂O thermodynamics and refuses to fabricate unverified biological or organic kinetic equations.',
+      'Enforces NEURANUM v2.0.0 scientific integrity policy: isolates inorganic CaCO₃ / CaSO₄·2H₂O thermodynamics and refuses to fabricate unverified biological or organic kinetic equations.',
     ],
     codeFiles: [
       'reports/literature_review.md',
@@ -385,7 +385,7 @@ export const ReferencesView: React.FC<{
             </span>
           </div>
           <p className="text-xs text-slate-400 max-w-3xl">
-            Every governing PDE, Donnan interface equation, HMW Pitzer virial table, CNT interfacial energy, regional desalination brine profile, and excluded boundary in REDMind v2.0.0 is mapped below to its exact source paper and file.
+            Every governing PDE, Donnan interface equation, HMW Pitzer virial table, CNT interfacial energy, regional desalination brine profile, and excluded boundary in NEURANUM v2.0.0 is mapped below to its exact source paper and file.
           </p>
         </div>
 
@@ -488,7 +488,7 @@ export const ReferencesView: React.FC<{
             <div className="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
               <div className="lg:col-span-8 space-y-1.5">
                 <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
-                  What Was Extracted &amp; Implemented in REDMind
+                  What Was Extracted &amp; Implemented in NEURANUM
                 </div>
                 <ul className="space-y-1.5 text-slate-300 leading-relaxed list-disc pl-4">
                   {ref.usedItems.map((item, i) => (

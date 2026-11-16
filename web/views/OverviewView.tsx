@@ -49,13 +49,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <section className="border-b border-[#1C2536] pb-7 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-7 space-y-4">
           <div className="text-xs font-mono text-cyan-400 tracking-wide uppercase">
-            REDMind v2.0.0 · 2D Reverse Electrodialysis Multiphysics &amp; Geochemistry
+            NEURANUM v2.0.0 · 2D Reverse Electrodialysis Multiphysics &amp; Geochemistry
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-50 leading-tight max-w-3xl">
             Spacially Resolved Ion Transport, Pitzer Scaling Thermodynamics, and Executable Verification for Reverse Electrodialysis
           </h1>
           <p className="text-sm text-slate-300 leading-relaxed max-w-[72ch]">
-            REDMind v2.0.0 resolves the concentrated vs. dilute cell-pair boundary layers using both the repaired 2D NaCl finite-difference/volume solver and a full 8-ion Nernst–Planck, elliptic potential, Donnan equilibrium, and Goldman–Hodgkin–Katz membrane solver—coupled one-way to USGS PHREEQC HMW Pitzer thermodynamics and Santoro et al. (2021) heterogeneous Classical Nucleation Theory.
+            NEURANUM v2.0.0 resolves the concentrated vs. dilute cell-pair boundary layers using both the repaired 2D NaCl finite-difference/volume solver and a full 8-ion Nernst–Planck, elliptic potential, Donnan equilibrium, and Goldman–Hodgkin–Katz membrane solver—coupled one-way to USGS PHREEQC HMW Pitzer thermodynamics and Santoro et al. (2021) heterogeneous Classical Nucleation Theory.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
@@ -93,6 +93,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               Run {vTotal}-Test Verification Suite
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('poster')}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium rounded border border-cyan-500/40 bg-[#131A27] hover:bg-[#1C2536] text-cyan-300 transition-colors whitespace-nowrap"
+            >
+              ISEF Poster (PDF &amp; Editable PPTX)
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

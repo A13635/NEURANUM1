@@ -14,6 +14,7 @@ import { VerificationView } from './views/VerificationView';
 import { FiguresView } from './views/FiguresView';
 import { ReferencesView } from './views/ReferencesView';
 import { MaterialsView } from './views/MaterialsView';
+import { PosterView } from './views/PosterView';
 
 const NAV_ITEMS: Array<{ id: NavTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -21,6 +22,7 @@ const NAV_ITEMS: Array<{ id: NavTab; label: string }> = [
   { id: 'datasets', label: 'Datasets' },
   { id: 'verification', label: 'Verification' },
   { id: 'library', label: 'Library' },
+  { id: 'poster', label: 'ISEF Poster' },
 ];
 
 export const App: React.FC = () => {
@@ -46,7 +48,7 @@ export const App: React.FC = () => {
       .then((data: OverviewPayload) => setOverview(data))
       .catch((err) =>
         setLoadError(
-          err instanceof Error ? err.message : 'Failed to load REDMind overview'
+          err instanceof Error ? err.message : 'Failed to load NEURANUM overview'
         )
       );
   }, []);
@@ -84,7 +86,7 @@ export const App: React.FC = () => {
             }}
             className="text-lg font-bold tracking-tight text-slate-50 whitespace-nowrap shrink-0 font-display"
           >
-            REDMind
+            NEURANUM
           </a>
 
           {/* Zone 2: 5 single-line navigation links */}
@@ -178,7 +180,7 @@ export const App: React.FC = () => {
                   {librarySubTab === 'figures'
                     ? 'All generated charts from results/figures/ spanning geometry, Poiseuille flow, 8-ion Nernst–Planck brines, Pitzer SI maps, CNT barriers, and mesh convergence.'
                     : librarySubTab === 'references'
-                      ? 'Every published paper, database, brine audit, and exclusion criterion behind REDMind v2.0.0 with exact extracted parameters and code paths.'
+                      ? 'Every published paper, database, brine audit, and exclusion criterion behind NEURANUM v2.0.0 with exact extracted parameters and code paths.'
                       : 'Rendered technical reports (with KaTeX equations), YAML/USGS pitzer.dat configs, Python modules, pytest suites, CLI scripts, and 42-parameter provenance.'}
                 </p>
               </div>
@@ -230,13 +232,15 @@ export const App: React.FC = () => {
             )}
           </div>
         )}
+
+        {activeTab === 'poster' && <PosterView />}
       </main>
 
       {/* Quiet Footer */}
       <footer className="border-t border-[#1C2536] py-3 px-6 text-xs text-slate-500">
         <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-4">
           <span>
-            REDMind v2.0.0 · 2D Reverse Electrodialysis Multiphysics &amp; Mineral Scaling Platform
+            NEURANUM v2.0.0 · 2D Reverse Electrodialysis Multiphysics &amp; Mineral Scaling Platform
           </span>
           <span className="font-mono tabular-nums">
             {overview
