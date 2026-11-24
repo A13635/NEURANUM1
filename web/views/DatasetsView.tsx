@@ -55,10 +55,18 @@ const CATEGORIES: Array<{
   },
   {
     id: 'multicomponent_brines',
-    label: '8-Ion Brines',
+    label: '8-Ion Brines (Discrete RO)',
     folders: [
-      { id: 'multicomponent_brines', label: 'Stage 2: 8-Ion Runs (41)' },
+      { id: 'multicomponent_brines', label: 'Stage 2A: 6 RO Brines (41)' },
       { id: 'brine_audit', label: 'Brine Electroneutrality Audit (7)' },
+    ],
+  },
+  {
+    id: 'pinn_corpus',
+    label: 'Continuous 18D 8-Ion Scaling Corpus',
+    folders: [
+      { id: 'pinn_8ion_sobol', label: 'Stage 2B: 18D 8-Ion + Pitzer + CNT Runs' },
+      { id: 'pinn_8ion_failure_log', label: 'Stage 2B Excluded Runs Log' },
     ],
   },
   {
@@ -164,22 +172,32 @@ export const DatasetsView: React.FC<DatasetsViewProps> = ({
     }
     const preferred = [
       'case_id',
+      'candidate_id',
       'profile_id',
       'scenario_group',
       'brine_profile_id',
+      'dominant_scaling_category',
       'result_classification',
       'converged',
+      'conc_Na_mol_m3',
+      'conc_Ca_mol_m3',
+      'conc_SO4_mol_m3',
+      'dic_inlet_mol_m3',
       'c_conc_inlet_mol_m3',
       'c_dil_inlet_mol_m3',
       'u_mean_conc_m_s',
       'temperature_K',
       'pH',
+      'load_fraction',
       'ocv_mV',
       'R_internal_Ohm_cm2',
       'P_gross_max_W_m2',
       'P_net_max_W_m2',
       'mineral_phase',
       'saturation_index',
+      'si_calcite_cem_max',
+      'si_gypsum_cem_max',
+      'calcite_barrier_het_kBT_max',
       'omega',
       'barrier_het_kBT',
       'delta_Rm_ohm_cm2',
@@ -794,6 +812,87 @@ const CategoryAnalyticsChart: React.FC<{
           ))}
           <text x={W / 2} y={H - 8} textAnchor="middle" fill="#64748B" fontSize="10" fontFamily="JetBrains Mono, monospace">
             Brine Equivalent Feed Salinity c_conc (mol/m³)
+          </text>
+        </svg>
+      </div>
+    );
+  }
+
+  // 5. Stage 2B Continuous 18D 8-Ion + Pitzer + CNT Corpus: Calcite vs Gypsum CEM Max SI
+  if (folder === 'pinn_8ion_sobol') {
+    const pts = rows
+      .map((r) => ({
+        siCal: Number(r.si_calcite_cem_max),
+        siGyp: Number(r.si_gypsum_cem_max),
+        cat: String(r.dominant_scaling_category ?? ''),
+      }))
+      .filter((p) => Number.isFinite(p.siCal) && Number.isFinite(p.siGyp));
+    if (pts.length === 0) return null;
+
+    let catA = 0;
+    let catB = 0;
+    let catC = 0;
+    for (const p of pts) {
+      if (p.cat.includes('Category C')) catC++;
+      else if (p.cat.includes('Category B')) catB++;
+      else catA++;
+    }
+
+    const W = 820;
+    const H = 210;
+    const padL = 56;
+    const padR = 24;
+    const padT = 18;
+    const padB = 34;
+    const xMin = Math.min(...pts.map((p) => p.siCal), -2.5);
+    const xMax = Math.max(...pts.map((p) => p.siCal), 2.5);
+    const yMin = Math.min(...pts.map((p) => p.siGyp), -1.8);
+    const yMax = Math.max(...pts.map((p) => p.siGyp), 0.5);
+    const toX = (v: number) =>
+      padL + ((v - xMin) / Math.max(xMax - xMin, 1e-6)) * (W - padL - padR);
+    const toY = (v: number) =>
+      padT + ((yMax - v) / Math.max(yMax - yMin, 1e-6)) * (H - padT - padB);
+
+    return (
+      <div className="border border-[#1C2536] bg-[#0E131D] rounded p-4 space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="font-semibold text-slate-100">
+            18D Continuous 8-Ion Thermodynamic Scaling Map ({pts.length} Solved Runs) — CEM Calcite SI_max vs Gypsum SI_max
+          </span>
+          <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] tabular-nums">
+            <span className="text-emerald-400">● Cat A Clean ({catA})</span>
+            <span className="text-cyan-300">● Cat B Scaling-Risk ({catB})</span>
+            <span className="text-amber-400">● Cat C Nucleation-Prone ({catC})</span>
+          </div>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto bg-[#080B11] rounded border border-[#1C2536]">
+          <line x1={toX(0)} y1={padT} x2={toX(0)} y2={H - padB} stroke="#334155" strokeDasharray="4 3" />
+          <line x1={padL} y1={toY(0)} x2={W - padR} y2={toY(0)} stroke="#334155" strokeDasharray="4 3" />
+          <text x={toX(0) + 4} y={padT + 12} fill="#64748B" fontSize="9.5" fontFamily="JetBrains Mono, monospace">
+            SI_calcite = 0
+          </text>
+          <text x={padL + 4} y={toY(0) - 5} fill="#64748B" fontSize="9.5" fontFamily="JetBrains Mono, monospace">
+            SI_gypsum = 0
+          </text>
+          {pts.map((p, idx) => {
+            const color = p.cat.includes('Category C')
+              ? '#F59E0B'
+              : p.cat.includes('Category B')
+                ? '#22D3EE'
+                : '#34D399';
+            return (
+              <circle
+                key={idx}
+                cx={toX(p.siCal)}
+                cy={toY(p.siGyp)}
+                r={3.0}
+                fill={color}
+                fillOpacity={0.82}
+              />
+            );
+          })}
+          <text x={W / 2} y={H - 8} textAnchor="middle" fill="#64748B" fontSize="10" fontFamily="JetBrains Mono, monospace">
+            Max CEM Wall Calcite Saturation Index SI_calcite (Pitzer HMW)
           </text>
         </svg>
       </div>

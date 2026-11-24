@@ -124,7 +124,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 {counts.repaired_baseline_51 + counts.total_new_cases}
               </div>
               <div className="mt-0.5 text-[11px] font-mono text-slate-500">
-                51 repaired + {counts.total_new_cases} Stages 1–4
+                51 repaired + {counts.total_new_cases} Stages 1–4 &amp; 18D Corpus
               </div>
             </div>
             <div className="p-3.5">
@@ -199,8 +199,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <ModuleTile
             icon={<Database className="w-4 h-4 text-cyan-400" />}
             title="Categorized Datasets by Fouling &amp; Brine Type"
-            meta="6 Scientific Dataset Types · .npz Loader"
-            body="Dedicated views &amp; quantitative charts for Clean Operating &amp; Baseline (136 runs), 8-Ion Desalination Brines (41 runs), Calcite &amp; Gypsum Wall SI (36 runs), CNT &amp; Exploratory ΔRm (26 runs), Organic/Silica/Biofouling Scope, and Failure/Benchmark Logs."
+            meta="7 Scientific Dataset Types · .npz Loader"
+            body={`Dedicated views & quantitative charts for Clean Baseline (136), Discrete 8-Ion Brines (41), Continuous 18D 8-Ion + Pitzer PINN Corpus (${counts.stage2b_pinn_8ion_sobol ?? '—'}), Wall SI (36), CNT & Exploratory ΔRm (26), and Organic/Silica/Biofouling Scope.`}
             actionLabel="Explore Datasets by Type"
             onClick={() => onNavigate('datasets')}
           />
@@ -305,6 +305,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     onClick={() =>
                       onNavigate('datasets', {
                         datasetCategory: 'multicomponent_brines',
+                      })
+                    }
+                    className="text-xs font-medium text-cyan-300 hover:text-cyan-200 whitespace-nowrap"
+                  >
+                    Open →
+                  </button>
+                </td>
+              </tr>
+              <tr className="hover:bg-[#131A27]/50">
+                <td className="py-3 px-4 font-semibold text-slate-100">
+                  Continuous 18D 8-Ion + Pitzer + CNT Corpus
+                </td>
+                <td className="py-3 px-4 font-mono tabular-nums text-cyan-300">
+                  pinn_8ion_sobol ({counts.stage2b_pinn_8ion_sobol ?? 'generating'})
+                </td>
+                <td className="py-3 px-4 text-slate-300">
+                  Halton/Sobol 18D continuous sweep (ion chemistry, pH, T, u, h, L, X_m, load, wetting) with full 2D fields &amp; node-wise Pitzer/CNT wall targets.
+                </td>
+                <td className="py-3 px-4 font-mono text-emerald-400 whitespace-nowrap">
+                  ● Verified Physics
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onNavigate('datasets', {
+                        datasetCategory: 'pinn_corpus',
                       })
                     }
                     className="text-xs font-medium text-cyan-300 hover:text-cyan-200 whitespace-nowrap"

@@ -10,6 +10,7 @@ export type NavTab =
 export type DatasetCategory =
   | 'clean_baseline'
   | 'multicomponent_brines'
+  | 'pinn_corpus'
   | 'inorganic_scaling'
   | 'cnt_exploratory'
   | 'organic_silica_biofouling'
@@ -120,12 +121,25 @@ export interface SimulationResultPayload {
   geochemistry: {
     siCalciteCemProfile: number[];
     siGypsumCemProfile: number[];
+    omegaCalciteCemProfile?: number[];
+    omegaGypsumCemProfile?: number[];
+    ionicStrengthCemProfile?: number[];
+    siCalciteAemProfile?: number[];
+    siGypsumAemProfile?: number[];
     daviesSiCalciteProfile: number[];
     daviesSiGypsumProfile: number[];
     omegaCalciteOutlet: number;
     siCalciteOutlet: number;
     omegaGypsumOutlet: number;
     siGypsumOutlet: number;
+    siCalciteCemMax?: number;
+    siGypsumCemMax?: number;
+    omegaCalciteCemMax?: number;
+    omegaGypsumCemMax?: number;
+    waterActivityOutlet?: number;
+    gammaCaOutlet?: number;
+    gammaCo3Outlet?: number;
+    gammaSo4Outlet?: number;
     ionicStrengthMolal: number;
     daviesValidityFlag: string;
     cntCalcite: {

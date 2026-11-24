@@ -617,16 +617,31 @@ export interface MulticomponentRunOutput {
   geochemistry: {
     siCalciteCemProfile: number[];
     siGypsumCemProfile: number[];
+    omegaCalciteCemProfile: number[];
+    omegaGypsumCemProfile: number[];
+    ionicStrengthCemProfile: number[];
+    siCalciteAemProfile: number[];
+    siGypsumAemProfile: number[];
     daviesSiCalciteProfile: number[];
     daviesSiGypsumProfile: number[];
     omegaCalciteOutlet: number;
     siCalciteOutlet: number;
     omegaGypsumOutlet: number;
     siGypsumOutlet: number;
+    siCalciteCemMax: number;
+    siGypsumCemMax: number;
+    omegaCalciteCemMax: number;
+    omegaGypsumCemMax: number;
+    waterActivityOutlet: number;
+    gammaCaOutlet: number;
+    gammaCo3Outlet: number;
+    gammaSo4Outlet: number;
     ionicStrengthMolal: number;
     daviesValidityFlag: string;
     cntCalcite: HeterogeneousNucleationResult;
     cntGypsum: HeterogeneousNucleationResult;
+    cntCalciteMax: HeterogeneousNucleationResult;
+    cntGypsumMax: HeterogeneousNucleationResult;
   };
   multicomponent: {
     speciesOrder: readonly SpeciesName[];
@@ -1421,48 +1436,53 @@ export function runMulticomponentSimulation(
     return { i: cur, v, p: cur * v };
   });
 
-  // One-way coupled USGS Pitzer HMW geochemistry using exact solved 8-ion CEM wall composition
-  const nEval = Math.min(11, cfg.nx);
-  const evalXIdx = Array.from({ length: nEval }, (_, k) =>
-    Math.round((k * (cfg.nx - 1)) / Math.max(nEval - 1, 1))
-  );
-  const evalPts: Array<{
-    idx: number;
-    siCal: number;
-    siGyp: number;
-    davCal: number;
-    davGyp: number;
-  }> = [];
-
-  let lastSat = evaluateMineralSaturationPitzer(concRaw, cfg.pH, cfg.T);
-  for (const ix of evalXIdx) {
-    const wallMap = {} as Record<SpeciesName, number>;
-    for (const sp of SPECIES_ORDER) wallMap[sp] = cConc[sp][ix][0];
-    lastSat = evaluateMineralSaturationPitzer(wallMap, cfg.pH, cfg.T);
-    evalPts.push({
-      idx: ix,
-      siCal: lastSat.si_calcite,
-      siGyp: lastSat.si_gypsum,
-      davCal: lastSat.davies_si_calcite,
-      davGyp: lastSat.davies_si_gypsum,
-    });
-  }
-
+  // One-way coupled USGS Pitzer HMW geochemistry at every streamwise CEM and AEM wall node
   const siCalciteCemProfile = new Array<number>(cfg.nx);
   const siGypsumCemProfile = new Array<number>(cfg.nx);
+  const omegaCalciteCemProfile = new Array<number>(cfg.nx);
+  const omegaGypsumCemProfile = new Array<number>(cfg.nx);
+  const ionicStrengthCemProfile = new Array<number>(cfg.nx);
+  const siCalciteAemProfile = new Array<number>(cfg.nx);
+  const siGypsumAemProfile = new Array<number>(cfg.nx);
   const daviesSiCalciteProfile = new Array<number>(cfg.nx);
   const daviesSiGypsumProfile = new Array<number>(cfg.nx);
-  for (let i = 0; i < cfg.nx; i++) {
-    let seg = 0;
-    while (seg < evalPts.length - 2 && i > evalPts[seg + 1].idx) seg++;
-    const p0 = evalPts[seg];
-    const p1 = evalPts[Math.min(seg + 1, evalPts.length - 1)];
-    const span = Math.max(p1.idx - p0.idx, 1);
-    const t = Math.max(0, Math.min(1, (i - p0.idx) / span));
-    siCalciteCemProfile[i] = p0.siCal + t * (p1.siCal - p0.siCal);
-    siGypsumCemProfile[i] = p0.siGyp + t * (p1.siGyp - p0.siGyp);
-    daviesSiCalciteProfile[i] = p0.davCal + t * (p1.davCal - p0.davCal);
-    daviesSiGypsumProfile[i] = p0.davGyp + t * (p1.davGyp - p0.davGyp);
+
+  let lastSat = evaluateMineralSaturationPitzer(concRaw, cfg.pH, cfg.T);
+  let omegaCalCemMax = -Infinity;
+  let omegaGypCemMax = -Infinity;
+  let siCalCemMax = -Infinity;
+  let siGypCemMax = -Infinity;
+
+  for (let ix = 0; ix < cfg.nx; ix++) {
+    const cemWall = {} as Record<SpeciesName, number>;
+    const aemWall = {} as Record<SpeciesName, number>;
+    for (const sp of SPECIES_ORDER) {
+      cemWall[sp] = cConc[sp][ix][0];
+      aemWall[sp] = cConc[sp][ix][cfg.ny - 1];
+    }
+    const satCem = evaluateMineralSaturationPitzer(cemWall, cfg.pH, cfg.T);
+    const satAem = evaluateMineralSaturationPitzer(aemWall, cfg.pH, cfg.T);
+    lastSat = satCem;
+
+    siCalciteCemProfile[ix] = satCem.si_calcite;
+    siGypsumCemProfile[ix] = satCem.si_gypsum;
+    omegaCalciteCemProfile[ix] = satCem.omega_calcite;
+    omegaGypsumCemProfile[ix] = satCem.omega_gypsum;
+    ionicStrengthCemProfile[ix] = satCem.ionic_strength_molal;
+    daviesSiCalciteProfile[ix] = satCem.davies_si_calcite;
+    daviesSiGypsumProfile[ix] = satCem.davies_si_gypsum;
+
+    siCalciteAemProfile[ix] = satAem.si_calcite;
+    siGypsumAemProfile[ix] = satAem.si_gypsum;
+
+    if (satCem.omega_calcite > omegaCalCemMax) {
+      omegaCalCemMax = satCem.omega_calcite;
+      siCalCemMax = satCem.si_calcite;
+    }
+    if (satCem.omega_gypsum > omegaGypCemMax) {
+      omegaGypCemMax = satCem.omega_gypsum;
+      siGypCemMax = satCem.si_gypsum;
+    }
   }
 
   const cntCalcite = evaluateHeterogeneousNucleation(
@@ -1475,6 +1495,20 @@ export function runMulticomponentSimulation(
   const cntGypsum = evaluateHeterogeneousNucleation(
     'Gypsum',
     lastSat.omega_gypsum,
+    cfg.T,
+    cfg.contactAngleCemDeg,
+    cfg.roughnessFactorCem
+  );
+  const cntCalciteMax = evaluateHeterogeneousNucleation(
+    'Calcite',
+    omegaCalCemMax,
+    cfg.T,
+    cfg.contactAngleCemDeg,
+    cfg.roughnessFactorCem
+  );
+  const cntGypsumMax = evaluateHeterogeneousNucleation(
+    'Gypsum',
+    omegaGypCemMax,
     cfg.T,
     cfg.contactAngleCemDeg,
     cfg.roughnessFactorCem
@@ -1579,16 +1613,31 @@ export function runMulticomponentSimulation(
     geochemistry: {
       siCalciteCemProfile,
       siGypsumCemProfile,
+      omegaCalciteCemProfile,
+      omegaGypsumCemProfile,
+      ionicStrengthCemProfile,
+      siCalciteAemProfile,
+      siGypsumAemProfile,
       daviesSiCalciteProfile,
       daviesSiGypsumProfile,
       omegaCalciteOutlet: lastSat.omega_calcite,
       siCalciteOutlet: lastSat.si_calcite,
       omegaGypsumOutlet: lastSat.omega_gypsum,
       siGypsumOutlet: lastSat.si_gypsum,
+      siCalciteCemMax: siCalCemMax,
+      siGypsumCemMax: siGypCemMax,
+      omegaCalciteCemMax: omegaCalCemMax,
+      omegaGypsumCemMax: omegaGypCemMax,
+      waterActivityOutlet: lastSat.water_activity,
+      gammaCaOutlet: lastSat.gamma_ca,
+      gammaCo3Outlet: lastSat.gamma_co3,
+      gammaSo4Outlet: lastSat.gamma_so4,
       ionicStrengthMolal: lastSat.ionic_strength_molal,
       daviesValidityFlag: lastSat.davies_validity_flag,
       cntCalcite,
       cntGypsum,
+      cntCalciteMax,
+      cntGypsumMax,
     },
     multicomponent: {
       speciesOrder: SPECIES_ORDER,

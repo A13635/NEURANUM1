@@ -257,6 +257,29 @@ async function startServer() {
           rows: csv.rows.map((r) => ({ ...r, _hasNpz: npzIds.has(r.case_id) })),
           npzFolder: 'multicomponent_brines',
         });
+      } else if (folder === 'pinn_8ion_sobol') {
+        const csv = readCsv('data/pinn_8ion_sobol/case_metadata.csv');
+        const npzIds = new Set(getNpzIds('data/pinn_8ion_sobol/generated'));
+        res.json({
+          folder,
+          title: `Stage 2B: Continuous 18D 8-Ion + Pitzer PINN Corpus (${csv.rows.length} Solved Runs)`,
+          description:
+            'Continuous Halton/Sobol 18D sweep coupling 2D 8-ion Nernst-Planck + Donnan-GHK transport with exact node-wise USGS Pitzer HMW thermodynamics and Santoro (2021) heterogeneous CNT.',
+          headers: csv.headers,
+          rows: csv.rows.map((r) => ({ ...r, _hasNpz: npzIds.has(r.case_id) })),
+          npzFolder: 'pinn_8ion_sobol',
+        });
+      } else if (folder === 'pinn_8ion_failure_log') {
+        const csv = readCsv('data/pinn_8ion_sobol/failure_log.csv');
+        res.json({
+          folder,
+          title: `Stage 2B Excluded Runs Log (${csv.rows.length} Non-Converged Candidates)`,
+          description:
+            'Every continuous Halton/Sobol candidate that failed convergence, positivity, or 2% species mass conservation—logged transparently without fabrication.',
+          headers: csv.headers,
+          rows: csv.rows,
+          npzFolder: null,
+        });
       } else if (folder === 'scaling_risk') {
         const csv = readCsv('data/scaling_risk/case_metadata.csv');
         const npzIds = new Set(getNpzIds('data/scaling_risk/generated'));
@@ -333,6 +356,7 @@ async function startServer() {
         'repaired_baseline_51',
         'clean_cases',
         'multicomponent_brines',
+        'pinn_8ion_sobol',
         'scaling_risk',
         'mineral_scaling',
       ]);

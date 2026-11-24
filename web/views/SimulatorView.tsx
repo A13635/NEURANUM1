@@ -176,7 +176,9 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({
       return { isWallOnly: true as const };
     }
 
-    const isMc = loadedNpz.folder === 'multicomponent_brines';
+    const isMc =
+      loadedNpz.folder === 'multicomponent_brines' ||
+      loadedNpz.folder === 'pinn_8ion_sobol';
     const xArr = (activeArrays.x_conc?.data ??
       activeArrays.x_interface?.data ??
       []) as number[];
